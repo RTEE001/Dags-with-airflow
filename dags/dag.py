@@ -1,14 +1,47 @@
 from airflow import DAG
-from airflow.operators.python import PythonOperator, BranchPythonOperator
-from airflow.operators.bash import BashOperator
-from datetime import datetime
+from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago 
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import requests
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 OWNER = os.getenv("OWNER")
+
+default_args = {
+    'owner' :'airflow',
+    'start_date': days_ago(5)
+}
+
+pr_dag = DAG(
+    'pr_filter',
+    default_args = default_args, 
+    description =  'notifies the user which pull requests need attention',
+    schedule_interval = timedelta(days =1), 
+    catchup = False
+)
+
+task1 = PythonOperator(
+    task_id = 'get_all_open_prs',
+    python_callable = get_all_open_prs,
+    dag = pr_dag, 
+)
+
+
+task2 = PythonOperator(
+    task_id = 'get_timestamps',
+    python_callable = get_timestamps,
+    dag = pr_dag, 
+)
+
+task3 = PythonOperator(
+    task_id = 'send_email',
+    python_callable = send_email,
+    dag = pr_dag, 
+)
+
+task1 >> task2 >> task3
 
 
 def get_all_repos():
