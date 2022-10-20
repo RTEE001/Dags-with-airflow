@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago , timedelta
+from datetime import datetime, timedelta
 import os
 # from dotenv import load_dotenv
 import requests
@@ -25,21 +25,33 @@ def  get_all_open_prs():
 
         for each_object_ in repos_with_open_prs:
             if len(each_object_) != 0:
-                repos_with_open_prs_details.append(each_object_['url'])
+                repos_with_open_prs_details.append({each_object_['html_url']: each_object_["url"] })
 
     return repos_with_open_prs_details
 
+def get_timestamps():
+    timestamps = []
+    for i in get_all_open_prs():
+        for key, val in i.items():
+            print(val)
+            comments_url = f"{val}/reviews"
+            url_response = requests.get(comments_url, auth=(OWNER, TOKEN))
+            comments = url_response.json()
+            for k in comments:
+                timestamps.append({key:k["submitted_at"]})
 
+    return timestamps
+ 
 default_args = {
     'owner' :'airflow',
-    'start_date': days_ago(5)
+    'start_date': datetime(2022, 10, 1),
 }
 
 pr_dag = DAG(
     'pr_filter',
     default_args = default_args, 
     description =  'notifies the user which pull requests need attention',
-    schedule = timedelta(days =1), 
+    schedule = timedelta(minutes = 5), 
     catchup = False
 )
 
@@ -50,11 +62,11 @@ task1 = PythonOperator(
 )
 
 
-# task2 = PythonOperator(
-#     task_id = 'get_timestamps',
-#     python_callable = get_timestamps,
-#     dag = pr_dag, 
-# )
+task2 = PythonOperator(
+    task_id = 'get_timestamps',
+    python_callable = get_timestamps,
+    dag = pr_dag, 
+)
 
 # task3 = PythonOperator(
 #     task_id = 'send_email',
@@ -62,7 +74,7 @@ task1 = PythonOperator(
 #     dag = pr_dag, 
 # )
 
-# task1 >> task2 >> task3
+task1 >> task2 
 
 
 
