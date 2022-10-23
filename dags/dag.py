@@ -5,16 +5,14 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import os
 import requests
-from airflow.models import Variable
 
-
-TOKEN = Variable.get("token")
-OWNER = Variable.get("owner")
-SMTP_SERVER = Variable.get("smtp_server")
-SMTP_PORT = Variable.get("smtp_port")
-SENDER_EMAIL_ADDRESS = Variable.get("smtp_login")
-RECEIPIENT_EMAIL_ADDRESS = Variable.get("receipient_email_address")
-SMTP_PASSWORD = Variable.get("smtp_password")
+TOKEN = os.getenv("TOKEN")
+OWNER = os.getenv("OWNER")
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = os.getenv("SMTP_PORT")
+SENDER_EMAIL_ADDRESS = os.getenv("SENDER_EMAIL_ADDRESS")
+RECEIPIENT_EMAIL_ADDRESS = os.getenv("RECEIPIENT_EMAIL_ADDRESS")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 def read_url(url):
     url_response = requests.get(url, auth=(OWNER, TOKEN))
@@ -87,11 +85,19 @@ def get_top_five_prs():
             urgent_prs.append(sort_timestamps()[i])
         return urgent_prs     
     return sort_timestamps()
- 
+
+def consolidate_pull_requests():
+    links = []
+
+    for each_dict in get_top_five_prs():
+        links.append(list((each_dict.keys()))[0])
+    return "\n\n".join(links)
+
+
 def send_email():
     
     subject = "Urgent pull requests that need attention"
-    body = get_top_five_prs()
+    body = consolidate_pull_requests()
 
     msg = MIMEText(body)
     msg["Subject"] = subject
@@ -128,7 +134,7 @@ get_open_prs = PythonOperator(
 
 get_latest_timestamps = PythonOperator(
     task_id = 'get_timestamps',
-    python_callable = sort_timestamps,
+    python_callable = consolidate_pull_requests,
     dag = pr_dag, 
 )
 
@@ -138,4 +144,3 @@ python_callable = send_email ,
 dag=pr_dag)
 
 get_open_prs >> get_latest_timestamps >> send_pr_email
-x
