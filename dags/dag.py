@@ -7,7 +7,7 @@ import os
 import requests
 
 TOKEN = os.getenv("TOKEN")
-OWNER = os.getenv("OWNER")
+USERNAME = os.getenv("USERNAME")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = os.getenv("SMTP_PORT")
 SENDER_EMAIL_ADDRESS = os.getenv("SENDER_EMAIL_ADDRESS")
@@ -15,7 +15,7 @@ RECEIPIENT_EMAIL_ADDRESS = os.getenv("RECEIPIENT_EMAIL_ADDRESS")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 def read_url(url):
-    url_response = requests.get(url, auth=(OWNER, TOKEN))
+    url_response = requests.get(url, auth=(USERNAME, TOKEN))
     response = url_response.json()
     return response
 
