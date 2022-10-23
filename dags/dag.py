@@ -1,47 +1,111 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+import smtplib
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import os
-# from dotenv import load_dotenv
 import requests
-
-# load_dotenv()
-# TOKEN = os.getenv("TOKEN")
-# OWNER = os.getenv("OWNER")
+from airflow.models import Variable
 
 
-def  get_all_open_prs():
+TOKEN = Variable.get("token")
+OWNER = Variable.get("owner")
+SMTP_SERVER = Variable.get("smtp_server")
+SMTP_PORT = Variable.get("smtp_port")
+SENDER_EMAIL_ADDRESS = Variable.get("smtp_login")
+RECEIPIENT_EMAIL_ADDRESS = Variable.get("receipient_email_address")
+SMTP_PASSWORD = Variable.get("smtp_password")
 
-    accessible_repos_url = f"https://api.github.com/user/repos?per_page=100"
-    accessible_repos_url_response = requests.get(
-        accessible_repos_url, auth=(OWNER, TOKEN)
-    )
-    accessible_repos = accessible_repos_url_response.json()
+def read_url(url):
+    url_response = requests.get(url, auth=(OWNER, TOKEN))
+    response = url_response.json()
+    return response
+
+def get_all_open_prs():
+
     repos_with_open_prs_details = []
-    for each_object in accessible_repos:
-        url = f"{each_object['url']}/pulls"
-        url_response = requests.get(url, auth=(OWNER, TOKEN))
-        repos_with_open_prs = url_response.json()
-
+    all_pr_response = read_url("https://api.github.com/user/repos?per_page=100")
+    for each_object in all_pr_response:
+        repos_with_open_prs = read_url(f"{each_object['url']}/pulls")
         for each_object_ in repos_with_open_prs:
             if len(each_object_) != 0:
-                repos_with_open_prs_details.append({each_object_['html_url']: each_object_["url"] })
+                repos_with_open_prs_details.append(
+                    {each_object_["html_url"]: each_object_["url"]}
+                )
 
     return repos_with_open_prs_details
+
 
 def get_timestamps():
     timestamps = []
     for i in get_all_open_prs():
         for key, val in i.items():
-            print(val)
-            comments_url = f"{val}/reviews"
-            url_response = requests.get(comments_url, auth=(OWNER, TOKEN))
-            comments = url_response.json()
-            for k in comments:
-                timestamps.append({key:k["submitted_at"]})
-
+            comments = read_url(f"{val}/reviews")
+            if len(comments) == 0:
+                url = read_url(val)
+                if url["updated_at"] != None:
+                    timestamps.append({url["html_url"]: url["updated_at"]})
+                else:
+                    timestamps.append({url["html_url"]: url["created_at"]})
+            else:
+                for k in comments:
+                    timestamps.append({key: k["submitted_at"]})
     return timestamps
+
+def filter_timestamps_by_latest_time():
+    result_dict = {}
+    for item in get_timestamps():
+        key = list(item.keys())[0]
+        if key in result_dict:
+            if item[key] > result_dict[key][key]:
+                result_dict.update({key: item})
+        else:
+            result_dict.update({key: item})
+    result_list = [v for k, v in result_dict.items()]
+    return result_list
+
+def sort_timestamps():
+    values = []
+    sorted_timestamps = []
+
+    for each_dict in filter_timestamps_by_latest_time():
+        values.append(list(each_dict.values())[0])
+
+    values.sort(reverse=True)
+
+    for each_dict in filter_timestamps_by_latest_time():
+        insert_index = values.index(list(each_dict.values())[0])
+        sorted_timestamps.insert(insert_index, {
+            list(each_dict.keys())[0] : values[insert_index]
+        })
+    return sorted_timestamps
+
+def get_top_five_prs():
+    urgent_prs = []
+    if len(sort_timestamps()) >5:
+        for i in range(5):
+            urgent_prs.append(sort_timestamps()[i])
+        return urgent_prs     
+    return sort_timestamps()
  
+def send_email():
+    
+    subject = "Urgent pull requests that need attention"
+    body = get_top_five_prs()
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = SENDER_EMAIL_ADDRESS
+    msg["To"] = RECEIPIENT_EMAIL_ADDRESS
+
+    smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+    smtp.starttls()
+    smtp.login(SENDER_EMAIL_ADDRESS, SMTP_PASSWORD)
+    smtp.sendmail(SENDER_EMAIL_ADDRESS, RECEIPIENT_EMAIL_ADDRESS, msg.as_string())
+    smtp.quit()
+
+
+
 default_args = {
     'owner' :'airflow',
     'start_date': datetime(2022, 10, 1),
@@ -55,49 +119,23 @@ pr_dag = DAG(
     catchup = False
 )
 
-task1 = PythonOperator(
+get_open_prs = PythonOperator(
     task_id = 'get_all_open_prs',
     python_callable = get_all_open_prs,
     dag = pr_dag, 
 )
 
 
-task2 = PythonOperator(
+get_latest_timestamps = PythonOperator(
     task_id = 'get_timestamps',
-    python_callable = get_timestamps,
+    python_callable = sort_timestamps,
     dag = pr_dag, 
 )
 
-# task3 = PythonOperator(
-#     task_id = 'send_email',
-#     python_callable = send_email,
-#     dag = pr_dag, 
-# )
+send_pr_email = PythonOperator( 
+task_id='send_email', 
+python_callable = send_email , 
+dag=pr_dag)
 
-task1 >> task2 
-
-
-
-
-# def get_timestamps():
-#     open_with_no_reviews =[]
-#     open_prs_with_reviews = []
-#     for each_pr in get_all_repos():
-#         comments_url = f"{each_pr}/reviews"
-#         url_response = requests.get(comments_url, auth=(OWNER, TOKEN))
-#         comments = url_response.json()
-#         if len(comments)==0:
-#             url = each_pr
-#             url_response = requests.get(comments_url, auth=(OWNER, TOKEN))
-#             comments = url_response.json()
-#             open_with_no_reviews.append(
-#                 comments
-#             )
-#             continue
-#         else:
-#             open_prs_with_reviews.append({
-#                 'submitted_at': comments["submitted_at"]
-#             })
-#     return open_with_no_reviews
-
-# print(get_timestamps())
+get_open_prs >> get_latest_timestamps >> send_pr_email
+x
