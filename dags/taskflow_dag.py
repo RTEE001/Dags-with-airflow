@@ -2,6 +2,22 @@ from airflow.models import Variable
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta
 
+
+# @task()
+# def write_all_deals_to_db(all_deals):
+#     sql_path = 'sql/insert_deal_into_deals_table.sql'
+#     for deal in all_deals:
+#         deal_json = _transform_json(deal)
+#         sql_query = open(path.join(ROOT_DIRECTORY, sql_path)).read()
+#         sql_query = sql_query.format(deal_json)
+#         pg = PostgresOperator(
+#             task_id='insert_deal',
+#             postgres_conn_id='my_db',
+#             sql=sql_query
+#         )
+#         pg.execute(dict())
+
+
 GITHUB_API_LINK = "https://api.github.com/user/repos?per_page=100"
 
 default_args = {
