@@ -17,4 +17,15 @@ with DAG(
     schedule = timedelta(minutes = 5),
     catchup = False,
     tags = ["pr"]
-)
+) as dag:
+    create_table = PostgresOperator(
+        task_id = "create_table",
+        postgres_conn_id = "postgres_db",
+        sql = """
+            CREATE TABLE IF NOT EXISTS PR(
+                pr_id SERIAL PRIMARY KEY,
+                name VARCHAR
+            );
+        """,
+    )
+    create_table
