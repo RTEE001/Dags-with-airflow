@@ -1,8 +1,16 @@
 import requests
 from airflow.models import Variable
+import json 
 
 TOKEN = Variable.get("TOKEN")
 USERNAME = Variable.get("USERNAME")
+
+
+def read_sql(pr):
+    sql_query = open(path.join(ROOT_DIRECTORY, sql_path)).read()
+    sql_query = sql_query.format(prs_json)
+    return sql_query
+
 
 def read_url(url):
     url_response = requests.get(url, auth=(USERNAME, TOKEN))

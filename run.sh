@@ -18,5 +18,7 @@ then
 else
     sudo mkdir ./plugins
 fi
+sudo chmod 777 ./logs
+sudo chmod 777 ./plugins
 sudo python3 setup.py develop
 sudo docker-compose up
