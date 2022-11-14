@@ -1,17 +1,31 @@
 import requests
 from airflow.models import Variable
+import json 
+from airflow.hooks.postgres_hook import PostgresHook
 
 TOKEN = Variable.get("TOKEN")
 USERNAME = Variable.get("USERNAME")
+GITHUB_API_LINK = "https://api.github.com/user/repos?per_page=100"
 
 def read_url(url):
     url_response = requests.get(url, auth=(USERNAME, TOKEN))
     response = url_response.json()
     return response
 
+def extract_from_db(table_name):
+        request = f"SELECT * FROM {table_name}"
+        pg_hook = PostgresHook(postgres_conn_id = "postgres_db", schema = "airflow")
+        connection = pg_hook.get_conn()
+        cursor = connection.cursor()
+        cursor.execute(request)
+        result = cursor.fetchall()
+        return result
+
 def get_timestamps(pr_list):
     timestamps = []
+    pr_list = [item for t in pr_list for item in t]
     for i in pr_list:
+        i = json.loads(i)
         for key, val in i.items():
             comments = read_url(f"{val}/reviews")
             if len(comments) == 0:
