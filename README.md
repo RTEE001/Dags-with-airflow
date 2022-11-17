@@ -41,6 +41,19 @@ SENDER_EMAIL_ADDRESS : <the email address sending the email>
 RECEIPIENT_EMAIL_ADDRESS : <the email address receiving the email>
 ```
 
+- Go to Admin > connections
+- This is where you will connect airflow to your postgres database using the following default variables:
+
+```
+connection id : postgres_db
+connection type : postgres
+host :postgres
+schema : airflow
+login : airflow
+password :airflow
+port :5432
+```
+
 - now stop the webserver
 
 - Then run:
