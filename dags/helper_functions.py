@@ -27,7 +27,9 @@ def extract_from_db(table_name):
 def create_and_populate_table(table_name, value):
     return f"""
             CREATE TABLE IF NOT EXISTS {table_name}(
-                name VARCHAR(10000)
+                html_url VARCHAR(10000),
+                api_url VARCHAR(10000),
+                timestamp VARCHAR(10000)
             );
             INSERT INTO {table_name}(name)
             VALUES ('{value}')
