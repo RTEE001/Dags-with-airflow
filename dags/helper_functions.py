@@ -14,8 +14,8 @@ def read_url(url):
     return response
 
 
-def extract_from_db(table_name):
-    request = f"SELECT * FROM {table_name}"
+def extract_prs_from_db(column_name):
+    request = f"SELECT {column_name} FROM pr"
     pg_hook = PostgresHook(postgres_conn_id="postgres_db", schema="airflow")
     connection = pg_hook.get_conn()
     cursor = connection.cursor()
@@ -24,35 +24,37 @@ def extract_from_db(table_name):
     return result
 
 
-def create_and_populate_table(table_name, value):
+def create_and_populate_table(browser_url, api_url):
     return f"""
-            CREATE TABLE IF NOT EXISTS {table_name}(
-                html_url VARCHAR(10000),
-                api_url VARCHAR(10000),
-                timestamp VARCHAR(10000)
-            );
-            INSERT INTO {table_name}(name)
-            VALUES ('{value}')
+            CREATE TABLE IF NOT EXISTS pr(
+                browser_url VARCHAR NOT NULL,
+                api_url VARCHAR NOT NULL,
+                reviews_url VARCHAR NOT NULL);
+            INSERT INTO pr(browser_url, api_url, reviews_url)
+            VALUES ('{browser_url}', '{api_url}', '{api_url}/reviews')
         """
 
+def add_column_to_db(col_name):
+    add_column_to_db = PostgresOperator(
+        task_id="add_column",
+        postgres_conn_id="postgres_db",
+        sql=f"""
+            ALTER TABLE pr
+            ADD {col_name} VARCHAR; 
+            """
+    )
+    add_column_to_db.execute(dict())
 
-def get_timestamps(pr_list):
-    timestamps = []
-    pr_list = [item for t in pr_list for item in t]
-    for i in pr_list:
-        i = json.loads(i)
-        for key, val in i.items():
-            comments = read_url(f"{val}/reviews")
-            if len(comments) == 0:
-                url = read_url(val)
-                if url["updated_at"] != None:
-                    timestamps.append({url["html_url"]: url["updated_at"]})
-                else:
-                    timestamps.append({url["html_url"]: url["created_at"]})
-            else:
-                for k in comments:
-                    timestamps.append({key: k["submitted_at"]})
-    return timestamps
+def add_items_to_db(col_name, item):
+    add_items_to_db= PostgresOperator(
+        task_id="add_item",
+        postgres_conn_id="postgres_db",
+        sql=f"""
+            INSERT INTO pr({col_name})
+            VALUES ('{item}')
+            """
+    )
+    add_items_to_db.execute(dict())
 
 
 def filter_timestamps_by_latest_time(pr_list):
