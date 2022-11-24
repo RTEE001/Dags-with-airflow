@@ -29,75 +29,64 @@ def pr_filter():
             repos_with_open_prs = read_url(f"{each_object['url']}/pulls")
             for each_object_ in repos_with_open_prs:
                 if len(each_object_) != 0:
-                    json_str_prs = json.dumps(
-                        {each_object_["html_url"]: each_object_["url"]}
-                    )
                     create_table = PostgresOperator(
                         task_id="create_table",
                         postgres_conn_id="postgres_db",
-                        sql=create_and_populate_table("pr", json_str_prs),
+                        sql=create_and_populate_table(each_object_["html_url"],  each_object_["url"]),
                     )
                     create_table.execute(dict())
 
     @task
-    def consolidate_pull_requests():
+    def get_timestamps():
         from helper_functions import (
-            get_timestamps,
-            filter_timestamps_by_latest_time,
-            sort_timestamps,
-            get_top_five_prs,
-            extract_from_db,
-            create_and_populate_table,
+            extract_prs_from_db,
+            add_column_to_db
         )
+    add_column_to_db("timestamps")
+    reviews = extract_prs_from_db("review_url")
+    for reviewed_pr in result:
+        comments = read_url(reviewed_pr)
+        if len(comments) == 0:
+            url = read_url(extract_prs_from_db("api_url"))
+            if url["updated_at"] != None:
+                add_items_to_db(timestamps, url["updated_at"])
+            else:
+                add_items_to_db(timestamps, url["created_at"])
+        else:
+            for k in comments:
+                add_items_to_db(timestamps, url["submitted_at"])
 
-        result = extract_from_db("pr")
-        timestamps = get_timestamps(result)
-        filtered_timestamps = filter_timestamps_by_latest_time(timestamps)
-        sorted_timestamps = sort_timestamps(filtered_timestamps)
-        top_prs = get_top_five_prs(sorted_timestamps)
+    # @task
+    # def send_email():
 
-        links = []
-        for each_dict in top_prs:
-            links.append(list((each_dict.keys()))[0])
-        links = "\n\n".join(links)
+    #     from helper_functions import extract_from_db
+    #     import smtplib
+    #     from email.mime.text import MIMEText
 
-        put_data = PostgresOperator(
-            task_id="put_data",
-            postgres_conn_id="postgres_db",
-            sql=create_and_populate_table("pr_timestamps", links),
-        )
-        put_data.execute(dict())
+    #     SMTP_SERVER = Variable.get("SMTP_SERVER")
+    #     SMTP_PORT = Variable.get("SMTP_PORT")
+    #     SENDER_EMAIL_ADDRESS = Variable.get("SENDER_EMAIL_ADDRESS")
+    #     RECEIPIENT_EMAIL_ADDRESS = Variable.get("RECEIPIENT_EMAIL_ADDRESS")
+    #     SMTP_PASSWORD = Variable.get("SMTP_PASSWORD")
 
-    @task
-    def send_email():
+    #     subject = "Urgent pull requests that need attention"
+    #     message = extract_from_db("pr_timestamps")
+    #     message = "\n".join([str(x) for t in message for x in t])
+    #     body = message
 
-        from helper_functions import extract_from_db
-        import smtplib
-        from email.mime.text import MIMEText
+    #     msg = MIMEText(body)
+    #     msg["Subject"] = subject
+    #     msg["From"] = SENDER_EMAIL_ADDRESS
+    #     msg["To"] = RECEIPIENT_EMAIL_ADDRESS
 
-        SMTP_SERVER = Variable.get("SMTP_SERVER")
-        SMTP_PORT = Variable.get("SMTP_PORT")
-        SENDER_EMAIL_ADDRESS = Variable.get("SENDER_EMAIL_ADDRESS")
-        RECEIPIENT_EMAIL_ADDRESS = Variable.get("RECEIPIENT_EMAIL_ADDRESS")
-        SMTP_PASSWORD = Variable.get("SMTP_PASSWORD")
+    #     smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+    #     smtp.starttls()
+    #     smtp.login(SENDER_EMAIL_ADDRESS, SMTP_PASSWORD)
+    #     smtp.sendmail(SENDER_EMAIL_ADDRESS, RECEIPIENT_EMAIL_ADDRESS, msg.as_string())
+    #     smtp.quit()
 
-        subject = "Urgent pull requests that need attention"
-        message = extract_from_db("pr_timestamps")
-        message = "\n".join([str(x) for t in message for x in t])
-        body = message
-
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = SENDER_EMAIL_ADDRESS
-        msg["To"] = RECEIPIENT_EMAIL_ADDRESS
-
-        smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        smtp.starttls()
-        smtp.login(SENDER_EMAIL_ADDRESS, SMTP_PASSWORD)
-        smtp.sendmail(SENDER_EMAIL_ADDRESS, RECEIPIENT_EMAIL_ADDRESS, msg.as_string())
-        smtp.quit()
-
-    get_all_open_prs() >> consolidate_pull_requests() >> send_email()
+    get_all_open_prs() >> get_timestamps() 
+    # >> send_email()
 
 
 pr_filter()
