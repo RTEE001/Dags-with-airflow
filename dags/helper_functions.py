@@ -56,11 +56,15 @@ def timestamps(html_url, time):
 
 
 def top_5_prs():
-    request = f"""select distinct html_url from timestamps
+    request = f"""
+    drop table if exists temp_table;
+    select distinct html_url, timestamp into table temp_table from timestamps
                 where timestamp 
                 in (select max(timestamp)
                 from timestamps group by  html_url)
-                LIMIT 5;"""
+                order by timestamp asc
+                LIMIT 5;
+select html_url from temp_table;"""
 
     pg_hook = PostgresHook(postgres_conn_id="postgres_db", schema="airflow")
     connection = pg_hook.get_conn()
