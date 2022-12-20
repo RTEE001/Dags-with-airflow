@@ -24,18 +24,20 @@ def extract_prs_from_db(column_name):
     result = cursor.fetchall()
     return result
 
-
-def create_and_populate_table_pr(html_url, api_url):
+def create_table_pr():
     return f"""
             CREATE TABLE IF NOT EXISTS pr(
                 browser_url VARCHAR NOT NULL,
                 api_url VARCHAR NOT NULL,
                 reviews_url VARCHAR NOT NULL);
+            """
+
+def populate_table_pr(html_url, api_url):
+    return f"""
             INSERT INTO pr(browser_url, api_url, reviews_url)
             VALUES ('{html_url}', '{api_url}', '{api_url}/reviews')
         """
-
-
+def create_table_timestamps
 def create_and_populate_table_timestamps(html_url, timestamps):
     return f"""
             CREATE TABLE IF NOT EXISTS timestamps(      
@@ -59,12 +61,11 @@ def top_5_prs():
     request = f"""
     drop table if exists temp_table;
     select distinct html_url, timestamp into table temp_table from timestamps
-                where timestamp 
-                in (select max(timestamp)
-                from timestamps group by  html_url)
-                order by timestamp asc
-                LIMIT 5;
-select html_url from temp_table;"""
+    where timestamp in 
+    (select max(timestamp) from timestamps group by  html_url)
+    order by timestamp asc
+    LIMIT 5;
+    select html_url from temp_table;"""
 
     pg_hook = PostgresHook(postgres_conn_id="postgres_db", schema="airflow")
     connection = pg_hook.get_conn()
