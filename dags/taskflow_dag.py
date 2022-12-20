@@ -1,7 +1,6 @@
 from airflow.models import Variable
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta
-from airflow.providers.postgres.operators.postgres import PostgresOperator
 import json
 
 GITHUB_API_LINK = "https://api.github.com/user/repos?per_page=100"
@@ -23,6 +22,7 @@ def pr_filter():
     @task
     def get_all_open_prs():
         from helper_functions import read_url, create_table_pr, populate_table_pr
+
         create_table_pr()
         all_pr_response = read_url(GITHUB_API_LINK)
         for each_object in all_pr_response:
@@ -33,7 +33,12 @@ def pr_filter():
 
     @task
     def get_timestamps():
-        from helper_functions import extract_prs_from_db, read_url, create_table_timestamps, populate_table_timestamps
+        from helper_functions import (
+            extract_prs_from_db,
+            read_url,
+            create_table_timestamps,
+            populate_table_timestamps,
+        )
 
         reviews = extract_prs_from_db("reviews_url")
         reviews = list(sum(reviews, ()))
@@ -48,7 +53,9 @@ def pr_filter():
                     populate_table_timestamps(url["html_url"], url["created_at"])
             else:
                 for k in comments:
-                    populate_table_timestamps( k["_links"]["html"]["href"].split("#", 1)[0], k["submitted_at"])
+                    populate_table_timestamps(
+                        k["_links"]["html"]["href"].split("#", 1)[0], k["submitted_at"]
+                    )
 
     @task
     def send_email():
@@ -80,5 +87,6 @@ def pr_filter():
         smtp.quit()
 
     get_all_open_prs() >> get_timestamps() >> send_email()
+
 
 pr_filter()
