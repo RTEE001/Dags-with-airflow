@@ -37,12 +37,15 @@ def populate_table_pr(html_url, api_url):
             INSERT INTO pr(browser_url, api_url, reviews_url)
             VALUES ('{html_url}', '{api_url}', '{api_url}/reviews')
         """
-def create_table_timestamps
-def create_and_populate_table_timestamps(html_url, timestamps):
-    return f"""
+def create_table_timestamps():
+        return f"""
             CREATE TABLE IF NOT EXISTS timestamps(      
                 html_url VARCHAR NOT NULL,
                 timestamp VARCHAR NOT NULL);
+            """
+
+def populate_table_timestamps(html_url, timestamps):
+    return f"""
             INSERT INTO timestamps(html_url, timestamp)
             VALUES ('{html_url}', '{timestamps}')
         """
@@ -57,7 +60,7 @@ def timestamps(html_url, time):
     create_table_timestamps.execute(dict())
 
 
-def top_5_prs():
+def get_top_5_prs():
     request = f"""
     drop table if exists temp_table;
     select distinct html_url, timestamp into table temp_table from timestamps

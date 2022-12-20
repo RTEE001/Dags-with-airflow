@@ -62,7 +62,7 @@ def pr_filter():
     @task
     def send_email():
 
-        from helper_functions import top_5_prs
+        from helper_functions import get_top_5_prs
         import smtplib
         from email.mime.text import MIMEText
 
@@ -73,7 +73,7 @@ def pr_filter():
         SMTP_PASSWORD = Variable.get("SMTP_PASSWORD")
 
         subject = "Urgent pull requests that need attention"
-        message = top_5_prs()
+        message = get_top_5_prs()
         message = "\n".join([str(x) for t in message for x in t])
         body = message
 
