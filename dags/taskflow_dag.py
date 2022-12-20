@@ -22,7 +22,7 @@ default_args = {
 def pr_filter():
     @task
     def get_all_open_prs():
-        from helper_functions import read_url, create_and_populate_table_pr
+        from helper_functions import read_url, create_table_pr, populate_table_pr
 
         all_pr_response = read_url(GITHUB_API_LINK)
         for each_object in all_pr_response:
