@@ -1,7 +1,6 @@
 from airflow.models import Variable
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta
-from airflow.providers.postgres.operators.postgres import PostgresOperator
 import json
 
 GITHUB_API_LINK = "https://api.github.com/user/repos?per_page=100"
@@ -22,47 +21,46 @@ default_args = {
 def pr_filter():
     @task
     def get_all_open_prs():
-        from helper_functions import read_url, create_and_populate_table_pr
+        from helper_functions import read_url, create_table_pr, populate_table_pr
 
+        create_table_pr()
         all_pr_response = read_url(GITHUB_API_LINK)
         for each_object in all_pr_response:
             repos_with_open_prs = read_url(f"{each_object['url']}/pulls")
             for each_object_ in repos_with_open_prs:
                 if len(each_object_) != 0:
-                    create_table = PostgresOperator(
-                        task_id="create_table",
-                        postgres_conn_id="postgres_db",
-                        sql=create_and_populate_table_pr(
-                            each_object_["html_url"], each_object_["url"]
-                        ),
-                    )
-                    create_table.execute(dict())
+                    populate_table_pr(each_object_["html_url"], each_object_["url"])
 
     @task
     def get_timestamps():
-        from helper_functions import extract_prs_from_db, read_url, timestamps
+        from helper_functions import (
+            extract_prs_from_db,
+            read_url,
+            create_table_timestamps,
+            populate_table_timestamps,
+        )
 
         reviews = extract_prs_from_db("reviews_url")
         reviews = list(sum(reviews, ()))
-
+        create_table_timestamps()
         for reviewed_pr in reviews:
             comments = read_url(reviewed_pr)
             if len(comments) == 0:
                 url = read_url(reviewed_pr.rsplit("/", 1)[0])
                 if url["updated_at"] != None:
-                    timestamps(url["html_url"], url["updated_at"])
+                    populate_table_timestamps(url["html_url"], url["updated_at"])
                 else:
-                    timestamps(url["html_url"], url["created_at"])
+                    populate_table_timestamps(url["html_url"], url["created_at"])
             else:
                 for k in comments:
-                    timestamps(
+                    populate_table_timestamps(
                         k["_links"]["html"]["href"].split("#", 1)[0], k["submitted_at"]
                     )
 
     @task
     def send_email():
 
-        from helper_functions import top_5_prs
+        from helper_functions import get_top_5_prs
         import smtplib
         from email.mime.text import MIMEText
 
@@ -73,7 +71,7 @@ def pr_filter():
         SMTP_PASSWORD = Variable.get("SMTP_PASSWORD")
 
         subject = "Urgent pull requests that need attention"
-        message = top_5_prs()
+        message = get_top_5_prs()
         message = "\n".join([str(x) for t in message for x in t])
         body = message
 
